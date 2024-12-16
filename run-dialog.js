@@ -30,7 +30,33 @@ class RunDialog {
       return false;
     });
 
-    this.entry = new Gtk.Entry({ placeholder_text: "Enter a command..." });
+    this.entry = new Gtk.Entry();
+    this.entry.set_margin_top(10);
+    this.entry.set_margin_bottom(10);
+    this.entry.set_margin_start(10);
+    this.entry.set_margin_end(10);
+
+    // Overlay to display placeholder text
+    this.placeholder = new Gtk.Label({
+      label: "Enter a command...",
+      halign: Gtk.Align.START,
+      valign: Gtk.Align.CENTER,
+      opacity: 0.5, // Make placeholder text slightly transparent
+      margin_start: 15, // Adjust alignment within the overlay
+    });
+
+    let overlay = new Gtk.Overlay();
+    overlay.add(this.entry);
+    overlay.add_overlay(this.placeholder);
+
+    // Update placeholder visibility based on input
+    this.entry.connect("changed", () => {
+      this.placeholder.set_visible(this.entry.get_text().trim() === "");
+    });
+
+    // Ensure placeholder visibility when the dialog is shown
+    this.placeholder.set_visible(true);
+
     this.completionLabel = new Gtk.Label({ visible: false });
 
     let vbox = new Gtk.Box({
@@ -39,7 +65,7 @@ class RunDialog {
       margin: 10,
     });
 
-    vbox.pack_start(this.entry, true, true, 0);
+    vbox.pack_start(overlay, true, true, 0);
     vbox.pack_start(this.completionLabel, false, false, 0);
 
     this.window.add(vbox);
@@ -59,11 +85,12 @@ class RunDialog {
       GLib.spawn_command_line_async(command);
       Gtk.main_quit(); // Close the app on successful execution
     } catch (error) {
+      // Handle invalid commands or errors
       this.completionLabel.set_text("Error: " + error.message);
       this.completionLabel.set_visible(true);
     }
 
-    this.entry.set_text("");
+    this.entry.set_text(""); // Clear the entry
   }
 }
 
