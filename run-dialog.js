@@ -35,7 +35,7 @@ class RunDialog {
       return false;
     });
 
-    let margin = 8;
+    let margin = 5;
 
     this.entry = new Gtk.Entry();
     this.entry.set_margin_top(margin);
@@ -49,18 +49,24 @@ class RunDialog {
     // Apply monospace font and font size
     const cssProvider = new Gtk.CssProvider();
     cssProvider.load_from_data(`
-            entry {
-              font-family: "Fira Code", monospace;
-              font-size: 16px;
-              padding: 5px;
-            }
-            .placeholder {
-              font-family: "Fira Code", monospace;
-              font-size: 16px;
-              font-weight: 300; /* Light font */
-              color: rgb(0, 0, 0); /* Slightly transparent gray */
-              padding-left: 200px; /* Align with entry text */
-            }
+          window {
+            border-radius: 5px; /* Round the corners of the window */
+            background-color: rgba(255, 255, 255, 0.95); /* Optional: Add a subtle background color */
+          }
+          entry {
+            font-family: "Fira Code", monospace;
+            font-size: 16px;
+            padding: 5px;
+            border-radius: 3px; /* Round the corners of the entry box */
+            border: 1px solid rgba(0, 0, 0, 0.2); /* Optional: Add a border for the entry */
+          }
+          .placeholder {
+            font-family: "Fira Code", monospace;
+            font-size: 16px;
+            font-weight: 300; /* Light font */
+            color: rgb(0, 0, 0); /* Slightly transparent gray */
+            padding-left: 200px; /* Align with entry text */
+          }
         `);
     Gtk.StyleContext.add_provider_for_screen(
       Gdk.Screen.get_default(),
@@ -110,11 +116,29 @@ class RunDialog {
   }
 
   _onCommandEntered() {
-    let command = this.entry.get_text().trim();
-    if (command.length === 0) return;
+    let input = this.entry.get_text().trim();
+    if (input.length === 0) return;
+
+    // Expand home directory (~) or relative paths
+    let expandedPath = GLib.build_filenamev([
+      GLib.get_home_dir(),
+      input.replace(/^~\//, "").replace(/^\.\//, ""),
+    ]);
 
     try {
-      GLib.spawn_command_line_async(command);
+      // Check if the input is a valid file or directory
+      if (GLib.file_test(expandedPath, GLib.FileTest.IS_DIR)) {
+        // Input is a folder - open with default file manager
+        let folderUri = Gio.File.new_for_path(expandedPath).get_uri();
+        Gio.app_info_launch_default_for_uri(folderUri, null);
+      } else if (GLib.file_test(expandedPath, GLib.FileTest.IS_REGULAR)) {
+        // Input is a file - open with default application
+        let fileUri = Gio.File.new_for_path(expandedPath).get_uri();
+        Gio.app_info_launch_default_for_uri(fileUri, null);
+      } else {
+        // Input is neither a file nor a folder - treat as command
+        GLib.spawn_command_line_async(input);
+      }
       Gtk.main_quit(); // Close the app on successful execution
     } catch (error) {
       // Handle invalid commands or errors
