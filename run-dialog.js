@@ -23,9 +23,11 @@ class RunDialog {
 
     // Handle ESC key to close the app
     this.window.connect("key-press-event", (widget, event) => {
-      if (event.get_keyval()[0] === Gdk.KEY_Escape) {
+      if (event.get_keyval()[1] === Gdk.KEY_Escape) {
         Gtk.main_quit();
+        return true;
       }
+      return false;
     });
 
     this.entry = new Gtk.Entry({ placeholder_text: "Enter a command..." });
