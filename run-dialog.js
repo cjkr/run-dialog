@@ -1,5 +1,5 @@
 imports.gi.versions.Gtk = "3.0";
-const { Gio, GLib, Gtk } = imports.gi;
+const { Gio, GLib, Gtk, Gdk } = imports.gi;
 
 Gtk.init(null);
 
@@ -10,12 +10,23 @@ class RunDialog {
 
   _buildUI() {
     this.window = new Gtk.Window({
-      title: "Run a Command",
       default_width: 400,
       default_height: 100,
     });
 
+    // Set properties for "run dialog" behavior
+    this.window.set_decorated(false); // Remove titlebar
+    this.window.set_skip_taskbar_hint(true); // Hide from taskbar
+    this.window.set_type_hint(Gdk.WindowTypeHint.DIALOG); // Dialog-type behavior
+    this.window.set_keep_above(true); // Always on top
     this.window.set_position(Gtk.WindowPosition.CENTER);
+
+    // Handle ESC key to close the app
+    this.window.connect("key-press-event", (widget, event) => {
+      if (event.get_keyval()[0] === Gdk.KEY_Escape) {
+        Gtk.main_quit();
+      }
+    });
 
     this.entry = new Gtk.Entry({ placeholder_text: "Enter a command..." });
     this.completionLabel = new Gtk.Label({ visible: false });
