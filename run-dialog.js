@@ -9,10 +9,7 @@ class RunDialog {
   }
 
   _buildUI() {
-    this.window = new Gtk.Window({
-      default_width: 400,
-      default_height: 100,
-    });
+    this.window = new Gtk.Window();
 
     // Set properties for "run dialog" behavior
     this.window.set_decorated(false); // Remove titlebar
@@ -30,19 +27,46 @@ class RunDialog {
       return false;
     });
 
+    let margin = 8;
+
     this.entry = new Gtk.Entry();
-    this.entry.set_margin_top(10);
-    this.entry.set_margin_bottom(10);
-    this.entry.set_margin_start(10);
-    this.entry.set_margin_end(10);
+    this.entry.set_margin_top(margin);
+    this.entry.set_margin_bottom(margin);
+    this.entry.set_margin_start(margin);
+    this.entry.set_margin_end(margin);
+    this.entry.set_halign(Gtk.Align.CENTER);
+    this.entry.set_valign(Gtk.Align.CENTER);
+    this.entry.set_width_chars(30);
+
+    // Apply monospace font and font size
+    const cssProvider = new Gtk.CssProvider();
+    cssProvider.load_from_data(`
+            entry {
+              font-family: "Fira Code", monospace;
+              font-size: 16px;
+              padding: 5px;
+            }
+            .placeholder {
+              font-family: "Fira Code", monospace;
+              font-size: 16px;
+              font-weight: 300; /* Light font */
+              color: rgb(0, 0, 0); /* Slightly transparent gray */
+              padding-left: 200px; /* Align with entry text */
+            }
+        `);
+    Gtk.StyleContext.add_provider_for_screen(
+      Gdk.Screen.get_default(),
+      cssProvider,
+      Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+    );
 
     // Overlay to display placeholder text
     this.placeholder = new Gtk.Label({
-      label: "Enter a command...",
+      label: "       Enter a command...",
       halign: Gtk.Align.START,
       valign: Gtk.Align.CENTER,
-      opacity: 0.5, // Make placeholder text slightly transparent
-      margin_start: 15, // Adjust alignment within the overlay
+      name: "placeholder", // Add a style class for targeted CSS,
+      opacity: 0.4,
     });
 
     let overlay = new Gtk.Overlay();
@@ -61,12 +85,12 @@ class RunDialog {
 
     let vbox = new Gtk.Box({
       orientation: Gtk.Orientation.VERTICAL,
-      spacing: 10,
-      margin: 10,
+      halign: Gtk.Align.CENTER,
+      valign: Gtk.Align.CENTER,
+      spacing: 0,
     });
 
-    vbox.pack_start(overlay, true, true, 0);
-    vbox.pack_start(this.completionLabel, false, false, 0);
+    vbox.pack_start(overlay, false, false, 0);
 
     this.window.add(vbox);
 
