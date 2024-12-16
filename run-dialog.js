@@ -1,7 +1,7 @@
 #!/usr/bin/env gjs
 
 imports.gi.versions.Gtk = "3.0";
-const { Gio, GLib, Gtk, Gdk } = imports.gi;
+const { Gio, GLib, Gtk, Gdk, GObject } = imports.gi;
 
 Gtk.init(null);
 
@@ -15,6 +15,9 @@ class RunDialog {
       print(`Failed to set working directory: ${error.message}`);
     }
 
+    this._currentSuggestions = []; // Initialize as an empty array
+    this._currentIndex = -1; // Initialize the index
+    this._lastInput = ""; // Track the last input text
     this._createRunDialog();
   }
 
@@ -101,7 +104,42 @@ class RunDialog {
     // Ensure placeholder visibility when the dialog is shown
     this.placeholder.set_visible(true);
 
-    this.completionLabel = new Gtk.Label({ visible: false });
+    // Handle keyboard events for cycling and input
+    this.entry.connect("key-press-event", (widget, event) => {
+      const keyVal = event.get_keyval()[1];
+
+      // TAB: Cycle forwards
+      if (keyVal === Gdk.KEY_Tab) {
+        this._cycleSuggestions(widget, 1); // Forward
+        return true; // Prevent default Tab behavior
+      }
+
+      // SHIFT+TAB: Cycle backwards
+      if (
+        keyVal === Gdk.KEY_ISO_Left_Tab ||
+        (event.get_state() & Gdk.ModifierType.SHIFT_MASK &&
+          keyVal === Gdk.KEY_Tab)
+      ) {
+        this._cycleSuggestions(widget, -1); // Backward
+        return true;
+      }
+
+      // Backspace/Delete: Let default handling occur
+      if (keyVal === Gdk.KEY_BackSpace || keyVal === Gdk.KEY_Delete) {
+        this._updateSuggestions(widget.get_text().trim());
+        return false; // Allow normal behavior
+      }
+
+      // Alphanumerics and special characters: Append to inputText
+      if (this._isPrintableKey(keyVal)) {
+        GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+          this._updateSuggestions(widget.get_text().trim());
+          return GLib.SOURCE_REMOVE; // Ensure the idle callback is removed after execution
+        });
+      }
+
+      return false; // Allow default behavior for other keys
+    });
 
     let vbox = new Gtk.Box({
       orientation: Gtk.Orientation.VERTICAL,
@@ -119,6 +157,111 @@ class RunDialog {
     this.window.connect("destroy", Gtk.main_quit);
 
     this.window.show_all();
+  }
+
+  _isPrintableKey(keyVal) {
+    // Allow alphanumeric and basic special characters
+    return (
+      (keyVal >= Gdk.KEY_space && keyVal <= Gdk.KEY_asciitilde) || // Printable ASCII
+      (keyVal >= Gdk.KEY_exclam && keyVal <= Gdk.KEY_slash) // Special keys (e.g., !, ?)
+    );
+  }
+
+  _updateSuggestions(input) {
+    if (input.length === 0 || input === this._lastInput) return;
+
+    // Generate new suggestions
+    this._currentSuggestions = Array.from(
+      new Set([
+        ...this._getFilePathSuggestions(input),
+        ...this._getCommandSuggestions(input),
+      ])
+    ).sort();
+
+    this._currentIndex = -1; // Reset the cycling index
+    this._lastInput = input; // Update last input
+  }
+
+  _cycleSuggestions(entry, direction) {
+    if (this._currentSuggestions.length === 0) return;
+
+    // Update index based on cycling direction (1: forward, -1: backward)
+    this._currentIndex =
+      (this._currentIndex + direction + this._currentSuggestions.length) %
+      this._currentSuggestions.length;
+
+    const suggestion = this._currentSuggestions[this._currentIndex];
+    entry.set_text(suggestion);
+    entry.set_position(suggestion.length); // Move cursor to the end
+  }
+
+  _getFilePathSuggestions(prefix) {
+    const suggestions = [];
+    let baseDir = GLib.get_home_dir(); // Default to home directory
+
+    if (prefix.startsWith("~")) {
+      baseDir = GLib.get_home_dir();
+      prefix = prefix.slice(1); // Remove '~'
+    } else if (prefix.startsWith("/")) {
+      baseDir = "/";
+    } else if (prefix.includes("/")) {
+      const parts = prefix.split("/");
+      baseDir = GLib.build_filenamev(parts.slice(0, -1));
+      prefix = parts.slice(-1)[0];
+    }
+
+    try {
+      const dir = Gio.File.new_for_path(baseDir);
+      const enumerator = dir.enumerate_children(
+        "standard::name",
+        Gio.FileQueryInfoFlags.NONE,
+        null
+      );
+
+      let fileInfo;
+      while ((fileInfo = enumerator.next_file(null))) {
+        const name = fileInfo.get_name();
+        if (name.startsWith(prefix)) {
+          suggestions.push(GLib.build_filenamev([baseDir, name]));
+        }
+      }
+    } catch (e) {
+      print(`Error enumerating directory: ${e.message}`);
+    }
+
+    print(`File Suggestions for '${prefix}': ${JSON.stringify(suggestions)}`);
+    return suggestions;
+  }
+
+  _getCommandSuggestions(prefix) {
+    const suggestions = [];
+    const pathDirs = GLib.getenv("PATH").split(":");
+
+    for (const dir of pathDirs) {
+      try {
+        const dirFile = Gio.File.new_for_path(dir);
+        const enumerator = dirFile.enumerate_children(
+          "standard::name",
+          Gio.FileQueryInfoFlags.NONE,
+          null
+        );
+
+        let fileInfo;
+        while ((fileInfo = enumerator.next_file(null))) {
+          const name = fileInfo.get_name();
+          if (name.startsWith(prefix)) {
+            suggestions.push(name);
+          }
+        }
+      } catch (e) {
+        // Skip directories that cannot be enumerated
+      }
+    }
+
+    print(
+      `Command Suggestions for '${prefix}': ${JSON.stringify(suggestions)}`
+    );
+    return suggestions;
   }
 
   _onCommandEntered() {
@@ -148,8 +291,7 @@ class RunDialog {
       Gtk.main_quit(); // Close the app on successful execution
     } catch (error) {
       // Handle invalid commands or errors
-      this.completionLabel.set_text("Error: " + error.message);
-      this.completionLabel.set_visible(true);
+      print(`Error: ${error.message}`);
     }
 
     this.entry.set_text(""); // Clear the entry
