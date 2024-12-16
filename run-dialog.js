@@ -5,6 +5,14 @@ Gtk.init(null);
 
 class RunDialog {
   constructor() {
+    // Set the user's home directory as PWD
+    try {
+      GLib.chdir(GLib.get_home_dir());
+      print(`Current working directory set to: ${GLib.get_home_dir()}`);
+    } catch (error) {
+      print(`Failed to set working directory: ${error.message}`);
+    }
+
     this._buildUI();
   }
 
