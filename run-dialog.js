@@ -47,7 +47,7 @@ class RunDialog {
     this.entry.set_margin_end(margin);
     this.entry.set_halign(Gtk.Align.CENTER);
     this.entry.set_valign(Gtk.Align.CENTER);
-    this.entry.set_width_chars(30);
+    this.entry.set_width_chars(40);
 
     // Apply monospace font and font size
     const cssProvider = new Gtk.CssProvider();
@@ -58,8 +58,9 @@ class RunDialog {
           }
           entry {
             font-family: "Fira Code", monospace;
-            font-size: 16px;
-            padding: 5px;
+            font-size: 12px;
+            padding: 0px;
+            padding-left: 5px;
             border-radius: 3px; /* Round the corners of the entry box */
             border: 1px solid #3daee9; /* Optional: Add a border for the entry */
             background-color:rgba(18, 18, 18, 0.79);
@@ -67,7 +68,7 @@ class RunDialog {
           }
           label {
             font-family: "Fira Code", monospace;
-            font-size: 16px;
+            font-size: 12px;
             font-weight: 300; /* Light font */
             color: #f7f7f7; /* Slightly transparent gray */
             padding-left: 5px; /* Align with entry text */
