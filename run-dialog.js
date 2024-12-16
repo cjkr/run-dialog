@@ -57,8 +57,7 @@ class RunDialog {
 
     try {
       GLib.spawn_command_line_async(command);
-      this.completionLabel.set_text("Command executed: " + command);
-      this.completionLabel.set_visible(true);
+      Gtk.main_quit(); // Close the app on successful execution
     } catch (error) {
       this.completionLabel.set_text("Error: " + error.message);
       this.completionLabel.set_visible(true);
