@@ -10,7 +10,7 @@ class RunDialog {
     // Set the user's home directory as PWD
     try {
       GLib.chdir(GLib.get_home_dir());
-      print(`Current working directory set to: ${GLib.get_home_dir()}`);
+      // print(`Current working directory set to: ${GLib.get_home_dir()}`);
     } catch (error) {
       print(`Failed to set working directory: ${error.message}`);
     }
@@ -57,25 +57,25 @@ class RunDialog {
     const cssProvider = new Gtk.CssProvider();
     cssProvider.load_from_data(`
           window {
-            border-radius: 5px; /* Round the corners of the window */
+            border-radius: 3px; /* Round the corners of the window */
             background-color: #333333; /* Optional: Add a subtle background color */
           }
           entry {
             font-family: "Fira Code", monospace;
-            font-size: 12px;
-            padding: 0px;
+            font-size: 16px;
+            padding: 2px;
             padding-left: 5px;
-            border-radius: 3px; /* Round the corners of the entry box */
+            border-radius: 2px; /* Round the corners of the entry box */
             border: 1px solid #3daee9; /* Optional: Add a border for the entry */
             background-color:rgba(18, 18, 18, 0.79);
             color:rgb(206, 206, 206);
           }
           label {
             font-family: "Fira Code", monospace;
-            font-size: 12px;
+            font-size: 16px;
             font-weight: 300; /* Light font */
             color: #f7f7f7; /* Slightly transparent gray */
-            padding-left: 5px; /* Align with entry text */
+            padding-left: 3px; /* Align with entry text */
           }
         `);
     Gtk.StyleContext.add_provider_for_screen(
@@ -240,7 +240,7 @@ class RunDialog {
       print(`Error enumerating directory: ${e.message}`);
     }
 
-    print(`File Suggestions for '${prefix}': ${JSON.stringify(suggestions)}`);
+    // print(`File Suggestions for '${prefix}': ${JSON.stringify(suggestions)}`);
     return suggestions;
   }
 
@@ -269,9 +269,9 @@ class RunDialog {
       }
     }
 
-    print(
-      `Command Suggestions for '${prefix}': ${JSON.stringify(suggestions)}`
-    );
+    // print(
+    //   `Command Suggestions for '${prefix}': ${JSON.stringify(suggestions)}`
+    // );
     return suggestions;
   }
 
