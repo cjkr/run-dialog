@@ -18,6 +18,7 @@ class RunDialog {
     this._currentSuggestions = []; // Initialize as an empty array
     this._currentIndex = -1; // Initialize the index
     this._lastInput = ""; // Track the last input text
+    this._shouldUpdateSuggestions = true; // Control flag for regenerating suggestions
     this._createRunDialog();
   }
 
@@ -108,37 +109,32 @@ class RunDialog {
     this.entry.connect("key-press-event", (widget, event) => {
       const keyVal = event.get_keyval()[1];
 
-      // TAB: Cycle forwards
+      // TAB: Cycle forwards through suggestions
       if (keyVal === Gdk.KEY_Tab) {
         this._cycleSuggestions(widget, 1); // Forward
         return true; // Prevent default Tab behavior
       }
 
-      // SHIFT+TAB: Cycle backwards
+      // SHIFT+TAB: Cycle backwards through suggestions
       if (
         keyVal === Gdk.KEY_ISO_Left_Tab ||
         (event.get_state() & Gdk.ModifierType.SHIFT_MASK &&
           keyVal === Gdk.KEY_Tab)
       ) {
         this._cycleSuggestions(widget, -1); // Backward
-        return true;
+        return true; // Prevent default Tab behavior
       }
 
-      // Backspace/Delete: Let default handling occur
-      if (keyVal === Gdk.KEY_BackSpace || keyVal === Gdk.KEY_Delete) {
-        this._updateSuggestions(widget.get_text().trim());
-        return false; // Allow normal behavior
+      // Reset the flag if typing new characters or deleting
+      if (
+        keyVal === Gdk.KEY_BackSpace ||
+        keyVal === Gdk.KEY_Delete ||
+        this._isPrintableKey(keyVal)
+      ) {
+        this._shouldUpdateSuggestions = true; // Mark that suggestions need to be regenerated
       }
 
-      // Alphanumerics and special characters: Append to inputText
-      if (this._isPrintableKey(keyVal)) {
-        GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-          this._updateSuggestions(widget.get_text().trim());
-          return GLib.SOURCE_REMOVE; // Ensure the idle callback is removed after execution
-        });
-      }
-
-      return false; // Allow default behavior for other keys
+      return false; // Allow normal behavior for other keys
     });
 
     let vbox = new Gtk.Box({
@@ -168,7 +164,13 @@ class RunDialog {
   }
 
   _updateSuggestions(input) {
-    if (input.length === 0 || input === this._lastInput) return;
+    if (
+      !this._shouldUpdateSuggestions ||
+      input.length === 0 ||
+      input === this._lastInput
+    ) {
+      return;
+    }
 
     // Generate new suggestions
     this._currentSuggestions = Array.from(
@@ -180,19 +182,28 @@ class RunDialog {
 
     this._currentIndex = -1; // Reset the cycling index
     this._lastInput = input; // Update last input
+    this._shouldUpdateSuggestions = false; // Prevent further unnecessary updates
   }
 
   _cycleSuggestions(entry, direction) {
-    if (this._currentSuggestions.length === 0) return;
+    const input = entry.get_text().trim();
 
-    // Update index based on cycling direction (1: forward, -1: backward)
-    this._currentIndex =
-      (this._currentIndex + direction + this._currentSuggestions.length) %
-      this._currentSuggestions.length;
+    // Regenerate suggestions if necessary
+    if (this._shouldUpdateSuggestions) {
+      this._updateSuggestions(input);
+    }
 
-    const suggestion = this._currentSuggestions[this._currentIndex];
-    entry.set_text(suggestion);
-    entry.set_position(suggestion.length); // Move cursor to the end
+    // Cycle through suggestions only if they exist
+    if (this._currentSuggestions.length > 0) {
+      // Update index based on cycling direction (1: forward, -1: backward)
+      this._currentIndex =
+        (this._currentIndex + direction + this._currentSuggestions.length) %
+        this._currentSuggestions.length;
+
+      const suggestion = this._currentSuggestions[this._currentIndex];
+      entry.set_text(suggestion);
+      entry.set_position(suggestion.length); // Move cursor to the end
+    }
   }
 
   _getFilePathSuggestions(prefix) {
@@ -269,25 +280,32 @@ class RunDialog {
     if (input.length === 0) return;
 
     // Expand home directory (~) or relative paths
-    let expandedPath = GLib.build_filenamev([
-      GLib.get_home_dir(),
-      input.replace(/^~\//, "").replace(/^\.\//, ""),
-    ]);
+    let expandedPath = input.replace(/^~\//, GLib.get_home_dir() + "/");
 
     try {
+      const file = Gio.File.new_for_path(expandedPath);
+
       // Check if the input is a valid file or directory
-      if (GLib.file_test(expandedPath, GLib.FileTest.IS_DIR)) {
-        // Input is a folder - open with default file manager
-        let folderUri = Gio.File.new_for_path(expandedPath).get_uri();
-        Gio.app_info_launch_default_for_uri(folderUri, null);
-      } else if (GLib.file_test(expandedPath, GLib.FileTest.IS_REGULAR)) {
-        // Input is a file - open with default application
-        let fileUri = Gio.File.new_for_path(expandedPath).get_uri();
-        Gio.app_info_launch_default_for_uri(fileUri, null);
+      if (file.query_exists(null)) {
+        const fileType = file
+          .query_info("standard::type", Gio.FileQueryInfoFlags.NONE, null)
+          .get_file_type();
+
+        if (fileType === Gio.FileType.DIRECTORY) {
+          // Input is a folder - open with default file manager
+          Gio.app_info_launch_default_for_uri(file.get_uri(), null);
+        } else if (fileType === Gio.FileType.REGULAR) {
+          // Input is a file - open with default application
+          Gio.app_info_launch_default_for_uri(file.get_uri(), null);
+        } else {
+          // Unknown file type
+          print("Unknown file type.");
+        }
       } else {
         // Input is neither a file nor a folder - treat as command
         GLib.spawn_command_line_async(input);
       }
+
       Gtk.main_quit(); // Close the app on successful execution
     } catch (error) {
       // Handle invalid commands or errors
