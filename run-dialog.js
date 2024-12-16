@@ -1,3 +1,5 @@
+#!/usr/bin/env gjs
+
 imports.gi.versions.Gtk = "3.0";
 const { Gio, GLib, Gtk, Gdk } = imports.gi;
 
